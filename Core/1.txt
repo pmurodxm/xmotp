@@ -1,0 +1,285 @@
+from flet import *
+from time import sleep
+from random import choice
+import asyncio
+
+from Core.Config import *
+from Core.Run import start_async_attacks
+from Core.Attack.Services import urls
+from Core.Attack.Feedback_Services import feedback_urls
+from Core.TBanner import banner
+
+color = check_config()['color']
+
+def main(page: Page):
+    page.window_center()
+    page.title = 'XM-SmsBomber'
+    page.scroll = 'adaptive'
+    page.auto_scroll = True
+    page.window_width = 560
+    page.window_height = 600
+    page.vertical_alignment = 'center'
+    page.horizontal_alignment = 'center'
+    page.theme_mode = check_config()['theme']
+    page.window_maximizable = False
+    page.window_resizable = False
+    change_config('attack', 'False')
+
+    def type_attack_change(e):
+        change_config('type_attack', f'{type_attack.value}')
+
+    def feedback_change(e):
+        change_config('feedback', f'{feedback.value}')
+
+    def theme_change(e):
+        page.theme_mode = 'dark' if page.theme_mode == 'light' else 'light'
+        page.update()
+        change_config('theme', page.theme_mode)
+
+    def color_change(e):
+        global color
+        _color = [MY_COLOR, 'red', 'pink', 'WHITE', 'black', 'purple', 'indigo', 'blue', 'cyan', 'teal', 'green', 'lime', 'yellow', 'amber', 'orange', 'brown', 'bluegrey', 'grey']
+        color = choice(_color)
+        
+        banner.controls = [
+            Text(spans=[TextSpan('XM-SMS OTP', TextStyle(size=85, foreground=Paint(color=color, stroke_width=9, stroke_join='round', style='stroke')))], font_family='Consolas'),
+            Text(spans=[TextSpan('XM-SMS OTP', TextStyle(size=95, color=color))], font_family='Consolas')
+        ]
+        
+        for field in [number, replay]:
+            field.border_color = color
+            field.cursor_color = color
+            field.focused_border_color = color
+            field.selection_color = color
+            field.label_style = TextStyle(color=color)
+        
+        type_attack.border_color = color
+        type_attack.label_style = TextStyle(color=color)
+        
+        feedback.active_color = color
+        
+        attack_button.color = color
+        
+        page.update()
+        change_config('color', color)
+
+    def error(message, reason='Xato'):
+        def button_cancel(e):
+            error_message.open = False
+            page.update()
+
+        error_message = AlertDialog(
+            title=Text(reason, color=color, size=30, text_align='center', font_family='Consolas'),
+            content=Text(message, font_family='Consolas'),
+            actions=[TextButton('OK', on_click=button_cancel, style=ButtonStyle(color=color))],
+            actions_alignment='end'
+        )
+
+        page.dialog = error_message
+        error_message.open = True
+        page.update()
+
+    def start_attack():
+        def button_cancel(e):
+            attack_window.open = False
+            page.update()
+
+        attack_window = AlertDialog(
+            modal=True,
+            title=Text('Hujum boshlandi', color=color, size=30, text_align=TextAlign.CENTER),
+            content=ProgressRing(width=48, height=48, color=color, stroke_width=6),
+            actions=[TextButton('Yopish', width=100, height=45, on_click=button_cancel, style=ButtonStyle(color=color))],
+            actions_alignment='end',
+            open=True
+        )
+
+        page.dialog = attack_window
+        page.update()
+
+        async def run_in_background():
+            try:
+                change_config('attack', 'True')
+                # Blocking kodni alohida threadda ishlatamiz
+                await asyncio.to_thread(start_async_attacks, number.value, int(replay.value))
+                change_config('attack', 'False')
+                
+                attack_window.open = False
+                page.update()
+                
+                page.show_snack_bar(
+                    SnackBar(
+                        content=Text("Hujum yakunlandi!", color="white", size=16),
+                        bgcolor=color,
+                        duration=4000
+                    )
+                )
+            except Exception as ex:
+                attack_window.open = False
+                page.update()
+                error(f"Hujumda xato yuz berdi:\n{str(ex)}", "Xato")
+
+        page.run_async(run_in_background())
+
+    def confirmation():
+        def button_cancel(e):
+            confirmation_window.open = False
+            page.update()
+
+        def button_continue(e):
+            confirmation_window.open = False
+            page.update()
+            sleep(0.3)  # kichik pauza
+            start_attack()
+
+        confirmation_window = AlertDialog(
+            modal=True,
+            title=Text('Diqqat!', color=color, size=30, text_align='center'),
+            content=Text(
+                'Hujumni boshlaganingizdan so‘ng darhol to‘xtatsangiz ham, jarayon to‘liq tugagunicha davom etadi!\n\nDavom etasizmi?'
+            ),
+            actions=[
+                TextButton('YO‘Q', on_click=button_cancel, style=ButtonStyle(color=color)),
+                TextButton('HA', on_click=button_continue, style=ButtonStyle(color=color))
+            ],
+            actions_alignment='end',
+            open=True
+        )
+        page.dialog = confirmation_window
+        page.update()
+
+    def checking_values(e):
+        if not number.value:
+            error('Telefon raqamni kiriting!')
+            number.focus()
+            return
+
+        if not number.value.isdigit():
+            error('Raqam faqat sonlardan iborat bo‘lishi kerak!')
+            number.focus()
+            return
+
+        if not replay.value:
+            error('Hujum sonini kiriting!')
+            replay.focus()
+            return
+
+        try:
+            replay_count = int(replay.value)
+            if not (1 <= replay_count <= 1000):
+                error('Soni 1 dan 1000 gacha bo‘lishi kerak!')
+                replay.focus()
+                return
+        except:
+            error('Soni to‘g‘ri raqam bo‘lishi kerak!')
+            replay.focus()
+            return
+
+        confirmation()
+
+    def information(e):
+        def button(e):
+            information_window.open = False
+            page.update()
+
+        information_window = AlertDialog(
+            content=Text('XM-SMS OTP / Dasturchi RegoTECH team by Murod', text_align='center', size=24, color=color, font_family='Consolas'),
+            actions=[TextButton('OK', width=110, height=50, on_click=button, style=ButtonStyle(color=color))],
+            actions_alignment='end',
+            open=True
+        )
+        page.dialog = information_window
+        page.update()
+
+    # --------------------------------------------------
+    # Kontentlar
+    # --------------------------------------------------
+    banner_widget = Stack([
+        Text(spans=[TextSpan('XM-SMS OTP', TextStyle(size=85, foreground=Paint(color=color, stroke_width=7, stroke_join='round', style='stroke')))], font_family='Consolas'),
+        Text(spans=[TextSpan('XM-SMS OTP', TextStyle(size=85, color=color))], font_family='Consolas')
+    ])
+
+    global number, replay, type_attack, feedback, attack_button
+    number = TextField(
+        label='Telefon raqamni kiriting "+" bilan',
+        width=275,
+        text_align='center',
+        border_radius=40,
+        border_color=color,
+        cursor_color=color,
+        focused_border_color=color,
+        autofocus=True,
+        selection_color=color,
+        label_style=TextStyle(color=color)
+    )
+
+    replay = TextField(
+        label='Soni',
+        width=131,
+        text_align='center',
+        border_radius=40,
+        border_color=color,
+        cursor_color=color,
+        focused_border_color=color,
+        selection_color=color,
+        value='1',
+        label_style=TextStyle(color=color)
+    )
+
+    type_attack = Dropdown(
+        label='Hujum turi',
+        hint_text='turini tanlang',
+        options=[
+            dropdown.Option('MIX'),
+            dropdown.Option('SMS'),
+            dropdown.Option('CALL')
+        ],
+        width=131,
+        border_radius=40,
+        alignment=alignment.bottom_center,
+        border_color=color,
+        value=check_config()['type_attack'],
+        label_style=TextStyle(color=color),
+        on_change=type_attack_change
+    )
+
+    feedback = Switch(
+        label='Feedback servislar (?)',
+        value=check_config()['feedback'] == 'True',
+        width=220,
+        active_color=color,
+        on_change=feedback_change,
+        tooltip='Internetga ulanish yoki kredit olish kabi so‘rov qoldiradigan servislar. Ehtiyot bo‘ling!'
+    )
+
+    attack_button = ElevatedButton(
+        content=Text('Hujumni boshlash', size=25),
+        on_click=checking_values,
+        width=220,
+        height=60,
+        color=color
+    )
+
+    page.add(
+        Text('\n', size=1),
+        banner_widget,
+        number,
+        Row([type_attack, replay], alignment=MainAxisAlignment.CENTER, spacing=20),
+        Container(content=feedback, padding=padding.only(top=10, bottom=10)),
+        attack_button,
+        Row([
+            IconButton(icon=icons.TELEGRAM, icon_size=48, tooltip='Channel', url='https://t.me/pmurod', icon_color=color),
+            IconButton(icon=icons.INFO, icon_size=48, tooltip='Ma\'lumot', icon_color=color, on_click=information)
+        ], alignment=MainAxisAlignment.CENTER, spacing=40)
+    )
+
+def Start(web=True):
+    if web:
+        host, port = '127.0.0.1', 9876
+        banner(host, port)
+        app(main, view=AppView.WEB_BROWSER, host=host, port=port)
+    else:
+        app(main)
+
+# Agar skript to'g'ridan-to'g'ri ishga tushirilsa
+if __name__ == '__main__':
+    Start(web=True)

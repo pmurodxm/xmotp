@@ -1,0 +1,10 @@
+├── core/
+├──.gitattributes
+├──.gitignore
+├──config.json
+├──DS_Store
+├──gui.py
+├──README.md
+├──requirements.txt
+├──start.py
+│
